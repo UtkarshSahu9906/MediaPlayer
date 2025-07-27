@@ -1,27 +1,28 @@
 package com.utkarsh.mediaplayer;
+
 import android.annotation.SuppressLint;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
-import android.provider.OpenableColumns;
 import android.provider.MediaStore;
-
+import android.provider.OpenableColumns;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 
 public class FileUtils {
 
     public static String getPathFromUri(Context context, Uri uri) {
         if (uri == null) return null;
 
-        // Handle file URIs (direct file paths)
+        // File scheme
         if (ContentResolver.SCHEME_FILE.equals(uri.getScheme())) {
             return uri.getPath();
         }
 
-        // Handle MediaStore URIs (videos, audio)
+        // MediaStore (videos/audio/images)
         if (ContentResolver.SCHEME_CONTENT.equals(uri.getScheme())) {
             String[] projection = {MediaStore.MediaColumns.DATA};
             try (Cursor cursor = context.getContentResolver().query(uri, projection, null, null, null)) {
@@ -32,7 +33,7 @@ public class FileUtils {
             }
         }
 
-        // Fallback: Copy file to cache and return path
+        // Fallback for other content providers
         return copyFileToCache(context, uri);
     }
 
@@ -50,7 +51,7 @@ public class FileUtils {
                 outputStream.flush();
                 return cacheFile.getAbsolutePath();
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             e.printStackTrace();
             return null;
         }

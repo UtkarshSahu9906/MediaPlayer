@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -9,22 +8,22 @@
     <SurfaceView
         android:id="@+id/videoSurface"
         android:layout_width="match_parent"
-        android:layout_height="300dp" />
+        android:layout_height="300dp"
+        android:layout_alignParentTop="true"/>
 
     <!-- Media Controls -->
     <LinearLayout
-        android:id="@+id/mediaControls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/videoSurface"
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- SeekBar & Time -->
+        <!-- SeekBar & Time Display -->
         <SeekBar
             android:id="@+id/seekBar"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"/>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -35,21 +34,21 @@
                 android:id="@+id/tvCurrentTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="00:00" />
+                android:text="00:00"/>
 
             <View
                 android:layout_width="0dp"
                 android:layout_height="1dp"
-                android:layout_weight="1" />
+                android:layout_weight="1"/>
 
             <TextView
                 android:id="@+id/tvTotalTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="00:00" />
+                android:text="00:00"/>
         </LinearLayout>
 
-        <!-- Playback Buttons -->
+        <!-- Control Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -60,28 +59,28 @@
                 android:id="@+id/btnPrevious"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⏮" />
+                android:text="⏮"/>
 
             <Button
                 android:id="@+id/btnPlay"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
-                android:text="▶" />
+                android:text="▶"/>
 
             <Button
                 android:id="@+id/btnNext"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="⏭" />
+                android:text="⏭"/>
         </LinearLayout>
 
-        <!-- File Selection Button -->
+        <!-- File Selection -->
         <Button
             android:id="@+id/btnSelectFile"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Select Media File" />
+            android:text="Select Media File"/>
     </LinearLayout>
 </RelativeLayout>
