@@ -1,145 +1,216 @@
 package com.utkarsh.mediaplayer;
 
-import static com.utkarsh.mediaplayer.FileUtils.getPathFromUri;
+
+
 
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.Button;
-import android.widget.MediaController;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
-
-import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-
 import java.io.IOException;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
+
+    private static final int FILE_SELECT_CODE = 1;
+    private static final int STORAGE_PERMISSION_CODE = 101;
+
     private MediaPlayer mediaPlayer;
-    private MediaController mediaController;
     private SurfaceView videoSurface;
     private SurfaceHolder videoHolder;
     private String currentFilePath;
+    private SeekBar seekBar;
+    private Handler updateHandler = new Handler();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialize UI elements
+        // Initialize UI
         videoSurface = findViewById(R.id.videoSurface);
         videoHolder = videoSurface.getHolder();
+        videoHolder.addCallback(this);
 
-        Button btnPlay = findViewById(R.id.btnPlay);
-        Button btnSelect = findViewById(R.id.btnSelectFile);
+        Button btnSelectFile = findViewById(R.id.btnSelectFile);
+        btnSelectFile.setOnClickListener(v -> selectMediaFile());
 
-        // Setup video surface
-        videoHolder.addCallback(new SurfaceHolder.Callback() {
-            @Override
-            public void surfaceCreated(SurfaceHolder holder) {
-                if (currentFilePath != null) {
-                    playMedia(currentFilePath);
-                }
-            }
-            // ... other required SurfaceHolder methods
-        });
-
-        btnSelect.setOnClickListener(v -> selectMediaFile());
-        btnPlay.setOnClickListener(v -> togglePlayPause());
+        setupMediaControls();
     }
 
     private void selectMediaFile() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("*/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(intent, 1);
+        startActivityForResult(intent, FILE_SELECT_CODE);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == FILE_SELECT_CODE && resultCode == RESULT_OK) {
-            if (data != null && data.getData() != null) {
-                Uri uri = data.getData();
-
-                try {
-                    // Get file path from URI
-                    currentFilePath = FileUtils.getPathFromUri(this, uri);
-
-                    if (currentFilePath != null) {
-                        // Verify file exists and is readable
-                        File mediaFile = new File(currentFilePath);
-                        if (mediaFile.exists() && mediaFile.canRead()) {
-                            playMedia(currentFilePath);
-                        } else {
-                            showToast("Cannot access selected file");
-                        }
-                    } else {
-                        showToast("Unsupported file source");
-                    }
-                } catch (SecurityException e) {
-                    showToast("Permission denied for file access");
-                    Log.e("MediaPlayer", "Security Exception: " + e.getMessage());
-                } catch (Exception e) {
-                    showToast("Error loading media file");
-                    Log.e("MediaPlayer", "File Error: " + e.getMessage());
-                }
+        if (requestCode == FILE_SELECT_CODE && resultCode == RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            currentFilePath = FileUtils.getPathFromUri(this, uri);
+            if (currentFilePath != null) {
+                playMedia(currentFilePath);
             } else {
-                showToast("No file selected");
+                showToast("Failed to get file path");
             }
         }
     }
 
-    // Helper method to show toast messages
-    private void showToast(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-    }
-    private void playMedia(Uri uri) {
-        String filePath = FileUtils.getPathFromUri(this, uri);
+    private void playMedia(String filePath) {
+        try {
+            releaseMediaPlayer();
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setDataSource(filePath);
 
-        if (filePath != null) {
-            try {
-                mediaPlayer.setDataSource(filePath);
-                mediaPlayer.prepare();
-                // ... rest of your playback logic
-            } catch (IOException e) {
-                Toast.makeText(this, "Error loading file", Toast.LENGTH_SHORT).show();
+            if (filePath.endsWith(".mp4") || filePath.endsWith(".mkv")) {
+                mediaPlayer.setDisplay(videoHolder);
             }
-        } else {
-            Toast.makeText(this, "Invalid file path", Toast.LENGTH_SHORT).show();
+
+            mediaPlayer.prepareAsync();
+            mediaPlayer.setOnPreparedListener(mp -> {
+                mp.start();
+                updatePlayPauseButton();
+                setupSeekBar();
+            });
+
+            mediaPlayer.setOnCompletionListener(mp -> {
+                updatePlayPauseButton();
+                showToast("Playback completed");
+            });
+
+        } catch (IOException e) {
+            showToast("Error loading media file");
+            e.printStackTrace();
         }
     }
 
+    private void setupMediaControls() {
+        Button btnPlay = findViewById(R.id.btnPlay);
+        btnPlay.setOnClickListener(v -> togglePlayPause());
+
+        Button btnPrevious = findViewById(R.id.btnPrevious);
+        btnPrevious.setOnClickListener(v -> seekRelative(-10000)); // -10 seconds
+
+        Button btnNext = findViewById(R.id.btnNext);
+        btnNext.setOnClickListener(v -> seekRelative(10000)); // +10 seconds
+
+        seekBar = findViewById(R.id.seekBar);
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser && mediaPlayer != null) {
+                    mediaPlayer.seekTo(progress);
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+    }
+
+    private void setupSeekBar() {
+        if (mediaPlayer == null) return;
+
+        seekBar.setMax(mediaPlayer.getDuration());
+        updateTimeText();
+
+        updateHandler.postDelayed(updateSeekBar, 1000);
+    }
+
+    private Runnable updateSeekBar = new Runnable() {
+        @Override
+        public void run() {
+            if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                seekBar.setProgress(mediaPlayer.getCurrentPosition());
+                updateTimeText();
+                updateHandler.postDelayed(this, 1000);
+            }
+        }
+    };
+
+    private void updateTimeText() {
+        TextView tvCurrentTime = findViewById(R.id.tvCurrentTime);
+        TextView tvTotalTime = findViewById(R.id.tvTotalTime);
+
+        if (mediaPlayer != null) {
+            tvCurrentTime.setText(formatTime(mediaPlayer.getCurrentPosition()));
+            tvTotalTime.setText(formatTime(mediaPlayer.getDuration()));
+        }
+    }
+
+    private String formatTime(int milliseconds) {
+        int seconds = (milliseconds / 1000) % 60;
+        int minutes = (milliseconds / (1000 * 60)) % 60;
+        return String.format("%02d:%02d", minutes, seconds);
+    }
 
     private void togglePlayPause() {
         if (mediaPlayer != null) {
             if (mediaPlayer.isPlaying()) {
                 mediaPlayer.pause();
-                ((Button)findViewById(R.id.btnPlay)).setText("▶");
             } else {
                 mediaPlayer.start();
-                ((Button)findViewById(R.id.btnPlay)).setText("⏸");
+                setupSeekBar();
             }
+            updatePlayPauseButton();
         }
     }
+
+    private void updatePlayPauseButton() {
+        Button btnPlay = findViewById(R.id.btnPlay);
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            btnPlay.setText("⏸");
+        } else {
+            btnPlay.setText("▶");
+        }
+    }
+
+    private void seekRelative(int milliseconds) {
+        if (mediaPlayer != null) {
+            int newPosition = mediaPlayer.getCurrentPosition() + milliseconds;
+            mediaPlayer.seekTo(Math.max(0, Math.min(newPosition, mediaPlayer.getDuration())));
+        }
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        if (currentFilePath != null) {
+            playMedia(currentFilePath);
+        }
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {}
 
     private void releaseMediaPlayer() {
         if (mediaPlayer != null) {
             mediaPlayer.release();
             mediaPlayer = null;
+            updateHandler.removeCallbacks(updateSeekBar);
         }
+    }
+
+    private void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         releaseMediaPlayer();
+        updateHandler.removeCallbacksAndMessages(null);
     }
 }
