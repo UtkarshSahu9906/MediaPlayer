@@ -10,6 +10,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.Button;
 import android.widget.MediaController;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -63,35 +64,59 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK && data != null) {
-            Uri uri = data.getData();
-            currentFilePath = getPathFromUri(MainActivity.this,uri);
-            playMedia(currentFilePath);
-        }
-    }
 
-    private void playMedia(String filePath) {
-        try {
-            releaseMediaPlayer();
+        if (requestCode == FILE_SELECT_CODE && resultCode == RESULT_OK) {
+            if (data != null && data.getData() != null) {
+                Uri uri = data.getData();
 
-            mediaPlayer = new MediaPlayer();
-            mediaPlayer.setDataSource(filePath);
+                try {
+                    // Get file path from URI
+                    currentFilePath = FileUtils.getPathFromUri(this, uri);
 
-            if (filePath.endsWith(".mp4") || filePath.endsWith(".3gp")) {
-                // Video setup
-                mediaPlayer.setDisplay(videoHolder);
-                setupMediaControls();
+                    if (currentFilePath != null) {
+                        // Verify file exists and is readable
+                        File mediaFile = new File(currentFilePath);
+                        if (mediaFile.exists() && mediaFile.canRead()) {
+                            playMedia(currentFilePath);
+                        } else {
+                            showToast("Cannot access selected file");
+                        }
+                    } else {
+                        showToast("Unsupported file source");
+                    }
+                } catch (SecurityException e) {
+                    showToast("Permission denied for file access");
+                    Log.e("MediaPlayer", "Security Exception: " + e.getMessage());
+                } catch (Exception e) {
+                    showToast("Error loading media file");
+                    Log.e("MediaPlayer", "File Error: " + e.getMessage());
+                }
+            } else {
+                showToast("No file selected");
             }
-
-            mediaPlayer.prepare();
-            mediaPlayer.start();
-
-          Button play =  findViewById(R.id.btnPlay);
-                  play.setText("⏸");
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
+
+    // Helper method to show toast messages
+    private void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+    private void playMedia(Uri uri) {
+        String filePath = FileUtils.getPathFromUri(this, uri);
+
+        if (filePath != null) {
+            try {
+                mediaPlayer.setDataSource(filePath);
+                mediaPlayer.prepare();
+                // ... rest of your playback logic
+            } catch (IOException e) {
+                Toast.makeText(this, "Error loading file", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "Invalid file path", Toast.LENGTH_SHORT).show();
+        }
+    }
+
 
     private void togglePlayPause() {
         if (mediaPlayer != null) {
