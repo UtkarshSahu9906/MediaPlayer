@@ -1,5 +1,7 @@
 package com.utkarsh.mediaplayer;
 
+import static com.utkarsh.mediaplayer.FileUtils.getPathFromUri;
+
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -63,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
-            currentFilePath = getPathFromUri(uri);
+            currentFilePath = getPathFromUri(MainActivity.this,uri);
             playMedia(currentFilePath);
         }
     }
